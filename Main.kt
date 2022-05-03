@@ -11,8 +11,7 @@ pouvoir faire bouger les drones 10/20
 travailler sur la logique 10-20/20
 
 TODO
-
-- une fois un point controllé, allé sur l'autre + proche en laissant un drone dessus
+- une fois un point controllé, aller sur l'autre + proche en laissant un drone dessus
 
  */
 
@@ -29,31 +28,25 @@ fun main(args : Array<String>) {
     val numberOfDrones = input.nextInt()
     val numberOfZones = input.nextInt()
 
-    val zoneFactory = ZoneFactory()
-    val playerFactory = PlayerFactory()
-    val droneFactory = DroneFactory()
-
-    // zones init
-    // A zone is a circle with a radius of 100 units.
+    // INITIALIZATION
+    // init des zones
     for (zoneId in 0 until numberOfZones) {
         val X = input.nextInt()
         val Y = input.nextInt()
-        GameEngine.addZone(zoneFactory.createZone(zoneId, X, Y, ZoneStateFree()))
+        GameEngine.addZone(ZoneFactory.createZone(zoneId, PointFactory.createPoint(X, Y), ZoneStateFree()))
     }
 
-    // players init
+    // init des joueurs
     for (i in 0 until numberOfPlayers) {
-        var player = playerFactory.createPlayer(i)
+        var player = PlayerFactory.createPlayer(i)
         GameEngine.addPlayer(player)
 
         // drones init
         for (i in 0 until numberOfDrones) {
-            var drone = droneFactory.createDrone(i,Point(0,0))
+            var drone = DroneFactory.createDrone(i,PointFactory.createPoint(0, 0))
             player.drones.add(drone)
         }
     }
-
-
 
     // game loop
     while (GameEngine.turns < 50) {
@@ -139,10 +132,9 @@ class Zone(val id: Int, val center: Point, var state: ZoneState) {
     }
 }
 
-class ZoneFactory {
-    fun createZone(id: Int, x: Int = 0, y: Int = 0, state: ZoneState): Zone {
-        val pf = PointFactory()
-        return Zone(id, pf.createPoint(x,y), state)
+object ZoneFactory {
+    fun createZone(id: Int, point: Point, state: ZoneState): Zone {
+        return Zone(id, point, state)
     }
 }
 
@@ -159,7 +151,7 @@ class Player(val id: Int, val drones: MutableList<Drone>, val zones: MutableList
     }
 }
 
-class PlayerFactory {
+object PlayerFactory {
     fun createPlayer(id: Int): Player {
         return Player(id, mutableListOf<Drone>(), mutableListOf<Zone>())
     }
@@ -171,7 +163,7 @@ class Point(var x: Int, var y: Int) {
     }
 }
 
-class PointFactory{
+object PointFactory{
     fun createPoint(x: Int = 0, y: Int = 0) : Point {
         return Point(x, y)
     }
@@ -212,13 +204,26 @@ class Drone(val id: Int, var position: Point) {
         return calculateClosestZone(filtered)
     }
 
+    fun isInRadius(zone: Zone) : Boolean {
+        val x = GameEngine.getDistance(zone.center, this.position)
+
+        var y = 0.0
+        if (this.position.y > zone.center.y) {
+            y = (this.position.y - zone.center.y).toDouble()
+        } else {
+            y = (zone.center.y - this.position.y).toDouble()
+        }
+
+        return sqrt(x.pow(2.0) - y.pow(2.0)) < 100
+    }
+
     fun changeState(state: DroneState) {
         this.state = state
         this.state.onEnterState()
     }
 }
 
-class DroneFactory {
+object DroneFactory {
     fun createDrone(id: Int, position: Point): Drone {
         return Drone(id,position)
     }

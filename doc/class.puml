@@ -1,0 +1,80 @@
+@startuml
+'https://plantuml.com/class-diagram
+left to right direction
+skinparam groupInheritance 3
+
+
+class GameEngine {
+    zones
+    players
+
+    addZone()
+    addPlayer()
+
+    getDistante(Point a, Point b)
+}
+
+class Player {
+    id
+    drones
+}
+
+class Point {
+    x
+    y
+}
+
+class Zone {
+    id
+    maxEnemyDroneFromOnePlayer
+
+    'canBeSaved()
+    'needHelp()
+    'allrightIllHandleThingsMySelf()
+}
+
+class Drone {
+    id
+    state
+    zone?
+
+    setX()
+    setY()
+    getClosestZones()
+    isInRadius(Zone)
+    move()
+}
+
+abstract class DroneState {
+    onEnterState()
+    move()
+}
+
+class DroneStateMoving
+class DroneStateCapturing
+class DroneStateDefending
+
+abstract class Listener {
+    onZoneCapture()
+}
+
+'relations
+GameEngine -down- Zone
+GameEngine - Player
+
+Drone <-up- DroneStateCapturing
+Drone <-up- DroneStateMoving
+Drone <-up- DroneStateDefending
+Drone -down-|> Listener
+Drone <-up- Point
+
+DroneState <|-down- DroneStateCapturing
+DroneState <|-down- DroneStateMoving
+DroneState <|-down- DroneStateDefending
+
+Zone <-up- Point
+
+
+
+
+@enduml
