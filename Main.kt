@@ -9,7 +9,7 @@ pouvoir faire bouger les drones 10/20
 travailler sur la logique 10-20/20
 
 TODO
-- [FEATURE] ]une fois un point controllé, aller sur l'autre + proche en laissant un drone dessus
+- [FEATURE] une fois un point controllé, aller sur l'autre + proche en laissant un drone dessus
 
 - [FEATURE] rechercher les drones les plus proche d'un de nos drones, puis calculer sa zone la plus proche, puis comparer cette distance par rapport au notre
 - si distance < autre drone -> on y va
@@ -81,6 +81,14 @@ object GameEngine {
     fun getPlayerById(id: Int): Player? {
         return players.firstOrNull { it.id == id }
     }
+    fun getPlayerByDrone(drone: Drone): Player {
+        players.forEach { player ->
+            if (player.drones.contains(drone)) {
+                return player
+            }
+        }
+        return personnalPlayer!!
+    }
 
     fun getAllDrones(): MutableList<Drone> {
         val drones = mutableListOf<Drone>()
@@ -89,6 +97,18 @@ object GameEngine {
                 drones.add(drone)
             }
         }
+        return drones
+    }
+
+    fun getEnemyDrones(): MutableList<Drone> {
+        val drones = mutableListOf<Drone>()
+        players
+            .filter { it !== personnalPlayer }
+            .forEach { player ->
+                player.drones.forEach { drone ->
+                    drones.add(drone)
+                }
+            }
         return drones
     }
 
@@ -163,6 +183,9 @@ object GameEngine {
 
             if (turns > 1) {
                 calculateTargets()
+                counterTargets()
+
+
             }
 
 
@@ -191,6 +214,35 @@ object GameEngine {
     fun calculateTargets() {
         getAllDrones().forEach { it.calculateTarget() }
     }
+
+    fun counterTargets() {
+
+        val untargetedZones = getUntargetedZones()
+
+        if (untargetedZones.isNotEmpty()) {
+            untargetedZones.forEach { zone ->
+                val drone = zone.closestDrone()
+                drone.goToZone(zone)
+                Logger.log("go to empty zone $drone")
+            }
+        }
+
+        getDrones().forEach { drone ->
+            getEnemyDrones()
+                .filter { enemyDrone ->
+                enemyDrone.target == drone.target
+            }
+
+            if (drone.target !== null) {
+                drone.goToZone(drone.target!!)
+                Logger.log("go to target $drone")
+            }
+
+        }
+
+
+    }
+
 
 
     // geometry utils
@@ -229,7 +281,13 @@ object GameEngine {
         return player == personnalPlayer
     }
 
+    fun distanceInTurns(distance: Double): Double {
+        return distance.div(100)
+    }
 
+    fun getUntargetedZones(): List<Zone> {
+        return zones.filter() { !it.isTargeted || it.isFree() }
+    }
 
 
 }
@@ -244,6 +302,7 @@ class Zone(
     var enemyDrones: MutableList<Drone> = mutableListOf<Drone>(),
     var personnalDrones: MutableList<Drone> = mutableListOf<Drone>()) {
     var controlledBy : Player? = null
+    var isTargeted = false
 
     /**
      * Calcule le nombre de drone du joueur qui a la zone
@@ -315,8 +374,23 @@ class Zone(
         return h < 100
     }
 
+    fun closestDrone(): Drone {
+        var closestDrones = mutableListOf<DroneTarget>()
+        GameEngine.getDrones().forEach { drone ->
+            closestDrones.add(DroneTarget(drone, GameEngine.getDistance(this.center, drone.position)))
+        }
+
+        closestDrones.sortBy { it.distance }
+
+        return closestDrones.first().drone
+    }
+
+    fun toStringAll() : String {
+        return "Zone $id [controlled by $controlledBy with $enemyDrones drones, center's at $center]"
+    }
+
     override fun toString() : String {
-        return "Zone $id [captured by TODO with $enemyDrones drones, $center]"
+        return "Zone $id"
     }
 }
 
@@ -377,6 +451,8 @@ object PointFactory{
  *       DRONE
  *********************/
 class Drone(
+
+    /** Vars */
     val id: Int,
     var position: Point,
     var lastPosition: Point
@@ -387,53 +463,48 @@ class Drone(
     var zone: Zone? = null
     var target: Zone? = null
 
-    fun calculateTarget() {
-        val candidates = mutableListOf<Target>()
-
-        GameEngine.zones.forEach { zone ->
-            if (GameEngine.getDistance(zone.center, position) < GameEngine.getDistance(zone.center, lastPosition)) {
-                candidates.add(Target(zone, GameEngine.getDistance(lastPosition, position)))
-            }
-        }
-
-        candidates.sortByDescending { it.distance }
-
-        if (candidates.isEmpty()) {
-            target = null
-        } else {
-
-            target = candidates.first().zone
-            Logger.log("1st target for Drone ${this.id} is Zone ${target!!.id}")
-
-//            if (candidates.count() == 1) {
-//                target = candidates.first().zone
-//                Logger.log("only 1 target of $this = $target")
-//            } else {
-//                Logger.log(candidates)
-//            }
-        }
-
-    }
-
+    /** Getter/Setters */
     fun setX(x: Int) {
         position.x = x
     }
-
     fun setY(y: Int) {
         position.y = y
     }
-
     fun setLastPositionX(x: Int) {
         lastPosition.x = x
     }
-
     fun setLastPositionY(y: Int) {
         lastPosition.y = y
     }
 
+    /** Utils */
+    fun calculateTarget() {
+        val candidates = mutableListOf<ZoneTarget>()
+
+        GameEngine.zones.forEach { zone ->
+            if (GameEngine.getDistance(zone.center, position) < GameEngine.getDistance(zone.center, lastPosition)) {
+                candidates.add(ZoneTarget(zone, GameEngine.getDistance(zone.center, position)))
+            }
+        }
+
+        candidates.sortBy { it.distance }
+
+        if (candidates.isNotEmpty()) {
+            candidates.first().zone.isTargeted = true
+
+            target = candidates.first().zone
+        } else {
+            target = null
+        }
+
+    }
+
+    fun goToZone(zone: Zone) {
+        changeState(DroneStateGoTo(zone))
+    }
+
     fun move() : String {
-        return GameEngine.getCenterOfZones().toString()
-//        return this.state.move()
+        return this.state.move()
     }
 
     /**
@@ -509,7 +580,7 @@ class Drone(
 
         // Si on a plus de la moitié des zones, DEFENSE
         if (GameEngine.zonesControlled.count() > GameEngine.numberOfZones / 2) {
-            changeState(DroneStateDefending(this))
+            changeState(DroneStateHardDefending(this))
             return
         }
 
@@ -546,14 +617,24 @@ class Drone(
 
     }
 
+    fun toStringAll() : String {
+        return "Drone $id is at position $position"
+    }
+
     override fun toString() : String {
-        return "Drone $id $position"
+        return "Drone $id"
     }
 }
 
-class Target(val zone: Zone, val distance: Double) {
+class ZoneTarget(val zone: Zone, val distance: Double) {
     override fun toString(): String {
         return "Target $zone à distance $distance"
+    }
+}
+
+class DroneTarget(val drone: Drone, val distance: Double) {
+    override fun toString(): String {
+        return "Target $drone à distance $distance"
     }
 }
 
@@ -576,7 +657,6 @@ class DroneStateIdle(val drone: Drone) : DroneState {
         Logger.state("CHANGING STATE TO IDLE")
 
         return GameEngine.getCenterOfZones().toString()
-//        return drone.position.toString()
     }
 }
 
@@ -620,7 +700,7 @@ class DroneStateRunThrewZones(val drone: Drone) : DroneState {
     }
 }
 
-class DroneStateDefending(val drone: Drone) : DroneState {
+class DroneStateHardDefending(val drone: Drone) : DroneState {
     override fun move() : String {
         Logger.state("CHANGING STATE TO DEFENSE")
 
@@ -636,6 +716,13 @@ class DroneStateDefending(val drone: Drone) : DroneState {
 
 
         return drone.position.toString()
+    }
+}
+
+class DroneStateGoTo(val zone: Zone) : DroneState {
+    override fun move() : String {
+        Logger.state("CHANGING STATE TO GO TO")
+        return zone.center.toString()
     }
 }
 
