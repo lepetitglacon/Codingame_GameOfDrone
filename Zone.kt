@@ -56,7 +56,14 @@ class Zone(val id: Int, val center: Point) {
         return targets.filter { drone -> !drone.isPersonnal() }.toMutableList()
     }
 
-    fun redistributeAlliedDrones(numberOfDronesToRedistribute: Int? = null) {
+    fun redistributeDrones(dronesToRedistribute: MutableList<Drone>) {
+        dronesToRedistribute.forEach { drone ->
+            Logger.log("Redistribution de $drone")
+            drone.calculateTarget(mutableListOf(this))
+        }
+    }
+
+    fun redistributeAlliedDronesByDelta(numberOfDronesToRedistribute: Int? = null) {
 
         if (numberOfDronesToRedistribute == null) {
             Logger.log("Redistribution de tous les drones ${getAlliedDronesInRadius()}")
@@ -72,6 +79,15 @@ class Zone(val id: Int, val center: Point) {
                 }
             }
         }
+    }
+
+    fun callUnusedDrone() {
+        Logger.log("Unused drone ${closestDrone()} has been called")
+        if (closestDrone().target!!.getAlliedDrones().count() > 1 && !closestDrone().target!!.isFree()) {
+            Logger.log("${closestDrone()} answering the call")
+            closestDrone().goToZone(this)
+        }
+
     }
 
     /**
@@ -105,6 +121,10 @@ class Zone(val id: Int, val center: Point) {
 
     fun isUnderControl(): Boolean {
         return controlledBy == GE.personnalPlayer && getEnemyDronesTargets().isEmpty()
+    }
+
+    fun isFree(): Boolean {
+        return dronesInRadius.isEmpty()
     }
 
     fun willBeUnderControl(): Boolean {

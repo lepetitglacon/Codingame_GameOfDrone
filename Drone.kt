@@ -6,7 +6,6 @@ class Drone
     var position: Point,
     var lastPosition: Point
     )
-    : ZoneObserver()
 {
     var state: DroneState = DroneStateClosestZone(this)
     var closestZones = mutableListOf<Zone>()
@@ -148,19 +147,6 @@ class Drone
 
     override fun toString() : String {
         return "Drone $id"
-    }
-
-    // Override ZoneObserver
-    override fun onZoneCapture() {
-
-    }
-
-    override fun onZoneEnter() {
-        TODO("Not yet implemented")
-    }
-
-    override fun onZoneLeave() {
-        TODO("Not yet implemented")
     }
 }
 

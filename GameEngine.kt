@@ -57,7 +57,7 @@ object GameEngine {
 
             // DRONES INIT
             for (j in 0 until numberOfDrones) {
-                val drone = DroneFactory.createDrone(j,PointFactory.createPoint(getCenterOfZones().x, getCenterOfZones().y))
+                val drone = DroneFactory.createDrone(j,PointFactory.createPoint(0, 0))
                 player.drones.add(drone)
             }
         }
@@ -112,7 +112,6 @@ object GameEngine {
             // tour 0
             if (isFirstTurn()) {
                 calculateClosestZones()
-
             } else {
 
                 // differentes fonctions selon la stratégie
@@ -146,7 +145,10 @@ object GameEngine {
 
             addPoints()
             showPoints()
-            addTurns()
+
+            players.forEach { player ->
+                addTurn(player)
+            }
         }
     }
 
@@ -163,6 +165,7 @@ object GameEngine {
 
         if (isPersonnalPlayer(player)) {
             player.drones.forEach { drone ->
+                Logger.log("make a move")
                 println(drone.move())
             }
         }
@@ -206,25 +209,41 @@ object GameEngine {
 
             when (globalDelta.sign) {
 
-                // On va controller la zone
+                /** On va controller la zone */
                 1 -> {
                     when (inRadiusDelta.sign) {
                         // on controlle actuellement la zone
                         1 -> {
                             when (inCommingDroneDelta.sign) {
                                 // plus d'allié sont en route
+                                // on redistribue le surplus
                                 1 -> {
-                                    zone.redistributeAlliedDrones(globalDelta)
+                                    zone.redistributeDrones(zone.getAlliedDronesTargets())
                                 }
                                 // aucun ou le même nombre
+                                // on ne change pas les targets sinon on perd le point
                                 0 -> {
-                                    zone.redistributeAlliedDrones(inCommingDroneDelta)
+
                                 }
                             }
                         }
-                        // la zone est sous tension
+                        // la zone est libre ou sous tension
                         0 -> {
+                            if (zone.isFree()) {
 
+                            }
+                            when (inCommingDroneDelta.sign) {
+                                // plus d'allié sont en route
+                                // on redistribue le surplus
+                                1 -> {
+                                    zone.redistributeDrones(zone.getAlliedDronesTargets())
+                                }
+                                // aucun ou le même nombre
+                                // on ne change pas les targets sinon on perd le point
+                                0 -> {
+
+                                }
+                            }
                         }
                         // on n'a pas la zone
                         -1 -> {
@@ -237,6 +256,7 @@ object GameEngine {
                 0 -> {
                     if (zone.dronesInRadius.isEmpty()) {
                         Logger.zoneControl("$zone est libre")
+                        zone.callUnusedDrone()
                     } else {
                         when (inRadiusDelta.sign) {
                             // on controlle actuellement la zone
@@ -281,7 +301,7 @@ object GameEngine {
                 // L'ennemi va controller la zone
                 -1 -> {
                     Logger.zoneControl("$zone va se faire controller par un autre joueur")
-                    zone.redistributeAlliedDrones()
+                    zone.redistributeDrones(zone.getAlliedDrones())
                 }
             }
 

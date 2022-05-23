@@ -13,9 +13,3 @@ fun main(args : Array<String>) {
     // GAME LOOP
     GE.play()
 }
-
-abstract class ZoneObserver() {
-    abstract fun onZoneCapture()
-    abstract fun onZoneEnter()
-    abstract fun onZoneLeave()
-}
