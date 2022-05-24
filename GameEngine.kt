@@ -2,11 +2,27 @@ import java.util.*
 import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sqrt
+import kotlin.math.absoluteValue
+
+/**
+CORRECTION
+bien respecter les consignes 5/20
+pouvoir faire bouger les drones 10/20
+travailler sur la logique 10-20/20
+ */
+
+fun main(args : Array<String>) {
+
+    // INITIALIZATION
+    GE.init(GameStrategie.COUNTERSTRIKE)
+
+    // GAME LOOP
+    GE.play()
+}
 
 typealias GE = GameEngine
 
 object GameEngine {
-
     // init
     var input = Scanner(System.`in`)
     var numberOfPlayers = 0
@@ -19,11 +35,11 @@ object GameEngine {
     var turns = 0
 
     // constantes
-    val zones = mutableListOf<Zone>()
-    val players = mutableListOf<Player>()
-    var personnalPlayer: Player = PlayerFactory.createPlayer(999)
+    val ZONES = mutableListOf<Zone>()
+    val PLAYERS = mutableListOf<Player>()
+    var PERSONNALPLAYER: Player = PlayerFactory.createPlayer(999)
 
-    // init
+    /** init codingame variables and creates objects */
     fun init(gameStrategie: GameStrategie) {
         numberOfPlayers = input.nextInt()
         personnalId = input.nextInt()
@@ -39,67 +55,55 @@ object GameEngine {
         for (zoneId in 0 until numberOfZones) {
             val X = input.nextInt()
             val Y = input.nextInt()
-            addZone(ZoneFactory.createZone(zoneId, PointFactory.createPoint(X, Y)))
+            ZONES.add(ZoneFactory.createZone(zoneId, PointFactory.createPointWithCoordinates(X, Y)))
         }
     }
 
     private fun initPlayersAndDrones() {
-        for (i in 0 until numberOfPlayers) {
+        for (playerId in 0 until numberOfPlayers) {
             val player: Player
 
-            if (i == personnalId) {
-                personnalPlayer.id = i
-                player = personnalPlayer
+            if (playerId == personnalId) {
+                PERSONNALPLAYER.id = playerId
+                player = PERSONNALPLAYER
             } else {
-                player = PlayerFactory.createPlayer(i)
-                addPlayer(player)
+                player = PlayerFactory.createPlayer(playerId)
             }
 
-            // DRONES INIT
-            for (j in 0 until numberOfDrones) {
-                val drone = DroneFactory.createDrone(j,PointFactory.createPoint(0, 0))
-                player.drones.add(drone)
+            PLAYERS.add(player)
+
+            // initialisation des drones
+            for (droneId in 0 until numberOfDrones) {
+                player.drones.add(DroneFactory.createDrone(droneId,PointFactory.createPoint()))
             }
         }
     }
 
     /** Update objects with CodeinGame input */
     private fun updateZonesControl() {
-        zones.forEach { zone ->
+        ZONES.forEach { zone ->
             val playerId = input.nextInt()
             zone.controlledBy = getPlayerById(playerId)
         }
     }
 
     private fun updateDronesPosition() {
-        players.forEach { player ->
+        PLAYERS.forEach { player ->
             player.drones.forEach { drone ->
-                // set last position
-                drone.setLastPositionX(drone.position.x)
-                drone.setLastPositionY(drone.position.y)
-                // set new position
-                drone.setX(input.nextInt())
-                drone.setY(input.nextInt())
+                drone.lastPosition = drone.position
+                drone.position.x = input.nextInt()
+                drone.position.y = input.nextInt()
             }
         }
     }
 
     /** Engine */
-    fun winning(): Boolean {
-        return controlsMoreZones() && hasMorePoints()
-    }
+    private fun isWinning(): Boolean = controlsMoreZones() && hasMorePoints()
+    private fun controlsMoreZones(): Boolean = ZONES.filter { it.controlledBy == PERSONNALPLAYER }.count() >= numberOfZones.div(2)
+    private fun hasMorePoints(): Boolean = PLAYERS.filter { it.points >= PERSONNALPLAYER!!.points }.first() == PERSONNALPLAYER
+    fun isAWinningTrade(): Boolean = ZONES.filter { it.controlledBy == PERSONNALPLAYER }.count() + 1 > (numberOfZones/2)
 
-    private fun controlsMoreZones(): Boolean {
-        return zones.filter { it.controlledBy == personnalPlayer }.count() >= numberOfZones.div(2)
-    }
-
-    private fun hasMorePoints(): Boolean {
-        return players.filter { it.points >= personnalPlayer!!.points }.first() == personnalPlayer
-    }
-
-    /**
-     * main
-     */
+    /** Main loop */
     fun play() {
 
         while (true) {
@@ -113,28 +117,23 @@ object GameEngine {
             if (isFirstTurn()) {
                 calculateClosestZones()
             } else {
-
-                // differentes fonctions selon la stratégie
                 when (gameStrategie) {
-
                     GameStrategie.COUNTERSTRIKE -> {
-
-                        if (winning()) {
-                            Logger.engine("WE ARE WINNING HOLD ON !!!!!!!!\n")
+                        if (isWinning()) {
+                            Logger.engine("WINNING\n")
                             calculateDefendingTargets()
                             counterTargets()
                         } else {
+                            Logger.engine("LOOSING\n")
                             calculateTargets()
                             counterTargets()
                         }
                     }
 
                     GameStrategie.DEFENDANDCONQUER -> {
-
                     }
 
                     GameStrategie.CLOSESTZONE -> {
-                        goToClosestZones()
                     }
 
                     else -> {
@@ -145,42 +144,28 @@ object GameEngine {
 
             addPoints()
             showPoints()
-
-            players.forEach { player ->
-                addTurn(player)
-            }
+            addTurns()
         }
     }
 
     private fun isFirstTurn() = turns == 0
 
     // engine
-    private fun addTurns() {
-        players.forEach { player ->
-            addTurn(player)
-        }
-    }
-
-    private fun addTurn(player: Player) {
+    private fun addTurns() = PLAYERS.forEach { makeMoves(it); addTurn() }
+    private fun addTurn() = turns++
+    private fun makeMoves(player: Player) {
 
         if (isPersonnalPlayer(player)) {
-            player.drones.forEach { drone ->
-                Logger.log("make a move")
-                println(drone.move())
-            }
+            player.drones.forEach { drone -> println(drone.move()) }
         }
-
-        turns++
     }
-
     private fun addPoints() {
-        zones.forEach { zone ->
+        ZONES.forEach { zone ->
             zone.controlledBy?.points = zone.controlledBy?.points!! + 1
         }
     }
-
     private fun showPoints() {
-        players.forEach { player ->
+        PLAYERS.forEach { player ->
             Logger.engine("POINTS\n")
             Logger.engine("\t$player has ${player.points} points")
         }
@@ -188,20 +173,21 @@ object GameEngine {
 
     /** Update objects/state/objectives */
 
-    // calculation
+    /**
+     * Calculate targets (zones) for every drones
+     */
     fun calculateTargets() {
-        zones.forEach { zone -> zone.setDronesInRadius() }
+        ZONES.forEach { it.setDronesInRadius() }
         getAllDrones().forEach { it.calculateTarget() }
     }
+    fun calculateDefendingTargets() = calculateTargets()
 
-    fun calculateDefendingTargets() {
-        zones.forEach { zone -> zone.setDronesInRadius() }
-        getAllDrones().forEach { it.calculateTarget() }
-    }
-
+    /**
+     * Counter enemy targets
+     */
     fun counterTargets() {
 
-        zones.forEach { zone ->
+        ZONES.forEach { zone ->
 
             val inRadiusDelta = zone.getAlliedDronesInRadius().count() - zone.getEnemyDronesInRadius().count()
             val inCommingDroneDelta = zone.getAlliedDronesTargets().count() - zone.getEnemyDronesTargets().count()
@@ -209,98 +195,32 @@ object GameEngine {
 
             when (globalDelta.sign) {
 
-                /** On va controller la zone */
+                // On va controller la zone
                 1 -> {
-                    when (inRadiusDelta.sign) {
-                        // on controlle actuellement la zone
-                        1 -> {
-                            when (inCommingDroneDelta.sign) {
-                                // plus d'allié sont en route
-                                // on redistribue le surplus
-                                1 -> {
-                                    zone.redistributeDrones(zone.getAlliedDronesTargets())
-                                }
-                                // aucun ou le même nombre
-                                // on ne change pas les targets sinon on perd le point
-                                0 -> {
-
-                                }
-                            }
-                        }
-                        // la zone est libre ou sous tension
-                        0 -> {
-                            if (zone.isFree()) {
-
-                            }
-                            when (inCommingDroneDelta.sign) {
-                                // plus d'allié sont en route
-                                // on redistribue le surplus
-                                1 -> {
-                                    zone.redistributeDrones(zone.getAlliedDronesTargets())
-                                }
-                                // aucun ou le même nombre
-                                // on ne change pas les targets sinon on perd le point
-                                0 -> {
-
-                                }
-                            }
-                        }
-                        // on n'a pas la zone
-                        -1 -> {
-
-                        }
+                    Logger.log("$zone va être gagnée")
+                    if (zone.controlledBy !== PERSONNALPLAYER) {
+                        zone.redistributeDrones(zone.getAlliedDrones())
                     }
                 }
 
                 // La zone va etre neutre ou sous tensions
                 0 -> {
-                    if (zone.dronesInRadius.isEmpty()) {
-                        Logger.zoneControl("$zone est libre")
+                    if (zone.isNotFocused() && zone.isFree()) {
+                        Logger.log("$zone est libre")
                         zone.callUnusedDrone()
                     } else {
-                        when (inRadiusDelta.sign) {
-                            // on controlle actuellement la zone
+                        Logger.log("$zone tempete")
+                        if (zone.closestDrone().isPersonnal()){
 
-                            1 -> {
-                                when (inCommingDroneDelta.sign) {
-                                    // plus d'allié sont en route
-                                    1 -> {
-                                        Logger.zoneControl("$zone est sous tension, controllé par ${zone.controlledBy}")
-                                    }
-                                    // aucun ou le même nombre
-                                    0 -> {
-                                        // on test le drone le plus proche
-                                        var closestDrone: Drone = zone.getDrones().first()
-                                        var distance: Double = GE.getDistance(zone.center, closestDrone.position)
-                                        zone.getDrones().forEach {
-                                            if (GE.getDistance(zone.center, it.position) < distance) {
-                                                closestDrone = it
-                                                distance = GE.getDistance(zone.center, it.position)
-                                            }
-                                        }
-
-                                        if (closestDrone.isPersonnal()) {
-                                            Logger.zoneControl("$zone est sous tension, controllé par ${zone.controlledBy}")
-                                        }
-                                    }
-                                }
-                            }
-                            // la zone est sous tension
-                            0 -> {
-
-                            }
-                            // on n'a pas la zone
-                            -1 -> {
-
-                            }
+                        } else {
+                            zone.redistributeDrones(zone.getAlliedDrones())
                         }
                     }
-
                 }
 
                 // L'ennemi va controller la zone
                 -1 -> {
-                    Logger.zoneControl("$zone va se faire controller par un autre joueur")
+                    Logger.log("$zone est perdue")
                     zone.redistributeDrones(zone.getAlliedDrones())
                 }
             }
@@ -308,41 +228,10 @@ object GameEngine {
         }
     }
 
-    fun calculateClosestZones() {
-        getAllDrones().forEach { drone ->
-            drone.calculateClosestZones()
-        }
-    }
+    /** Calcule les zones les plus proches de chaques drones */
+    fun calculateClosestZones() = getAllDrones().forEach { drone -> drone.calculateClosestZones() }
 
-    /**
-     *
-     */
-    fun goToClosestZones() {
-
-        getDrones().forEach { drone ->
-            Logger.log("$drone\r")
-            Logger.log("\tzone p proche = ${drone.closestZones}\r")
-
-            if (drone.state !is DroneStateClosestZone) {
-                drone.changeState(DroneStateClosestZone(drone))
-            }
-
-            if (drone.isInRadius(drone.closestZones.first())) {
-                drone.calculateClosestZones(drone.closestZones.first())
-            }
-        }
-    }
-
-    fun closestDroneFromZoneGoesToClosestZone() {
-        zones.forEach { zone ->
-            zone.closestDrone().goToZone(zone)
-        }
-    }
-
-    // geometry utils
-    /**
-     * @return Double : distance entre 2 points
-     */
+    /** Donne la distance entre 2 Points */
     fun getDistance(a: Point, b: Point): Double {
         val x = (b.x.toDouble() - a.x.toDouble()).pow(2.0)
         val y = (b.y.toDouble() - a.y.toDouble()).pow(2.0)
@@ -351,57 +240,37 @@ object GameEngine {
         return distance
     }
 
-    /**
-     * @return Point : point médian entre toutes les zones
-     */
-    fun getCenterOfZones(): Point {
+    /** Donne le point médian entre toute les zones */
+    fun getCenterOfPoints(points: MutableList<Point>): Point {
         var x = 0
         var y = 0
-        zones.forEach { zone ->
-            x += zone.center.x
-            y += zone.center.y
+        points.forEach { point ->
+            x += point.x
+            y += point.y
         }
-        return PointFactory.createPoint(x.div(zones.count()), y.div(zones.count()))
+        return PointFactory.createPointWithCoordinates(x.div(points.count()), y.div(points.count()))
     }
 
     // general utils
-    /**
-     * @return Boolean : est-ce que c'est notre joueur ?
-     */
-    fun isPersonnalPlayer(player: Player): Boolean {
-        return player == personnalPlayer
-    }
+    private fun isPersonnalPlayer(player: Player): Boolean = player == PERSONNALPLAYER
+    fun getPlayerById(id: Int): Player? = PLAYERS.firstOrNull { it.id == id }
 
-    /** Getters/Setters */
-    // customs setters/getters
-    fun addZone(zone: Zone) {
-        zones.add(zone)
-    }
-    fun getZoneById(id: Int): Zone {
-        return zones.first { it.id == id }
-    }
-
-    fun addPlayer(player: Player) {
-        players.add(player)
-    }
-    fun getPlayerById(id: Int): Player? {
-        return players.firstOrNull { it.id == id }
-    }
     fun getPlayerByDrone(drone: Drone): Player {
-        players.forEach { player ->
+        PLAYERS.forEach { player ->
             if (player.drones.contains(drone)) {
                 return player
             }
         }
-        return personnalPlayer!!
+        return PERSONNALPLAYER
     }
 
-    /**
-     * @return tous les drones
-     */
+    /** Donne les drones alliés */
+    fun getAlliedDrones(): MutableList<Drone> = PERSONNALPLAYER.drones
+
+    /** Donne tous les drones*/
     fun getAllDrones(): MutableList<Drone> {
         val drones = mutableListOf<Drone>()
-        players.forEach { player ->
+        PLAYERS.forEach { player ->
             player.drones.forEach { drone ->
                 drones.add(drone)
             }
@@ -409,13 +278,11 @@ object GameEngine {
         return drones
     }
 
-    /**
-     * @return tous les drones enemies
-     */
+    /** Donne tous les drones enemies */
     fun getEnemyDrones(): MutableList<Drone> {
         val drones = mutableListOf<Drone>()
-        players
-            .filter { it !== personnalPlayer }
+        PLAYERS
+            .filter { it !== PERSONNALPLAYER }
             .forEach { player ->
                 player.drones.forEach { drone ->
                     drones.add(drone)
@@ -423,15 +290,6 @@ object GameEngine {
             }
         return drones
     }
-
-    /**
-     * @return les drones de notre joueur
-     */
-    fun getDrones(): MutableList<Drone> {
-        return personnalPlayer?.drones ?: mutableListOf<Drone>()
-    }
-
-
 }
 
 enum class GameStrategie {
@@ -439,3 +297,7 @@ enum class GameStrategie {
     DEFENDANDCONQUER,
     CLOSESTZONE
 }
+
+/**
+ * END OF GAME ENGINE
+ */

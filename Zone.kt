@@ -1,8 +1,12 @@
+/**
+ * START ZONE
+ */
+
 class Zone(val id: Int, val center: Point) {
     var controlledBy: Player? = null
-
     var dronesInRadius: MutableList<Drone> = mutableListOf()
     var targets: MutableList<Drone> = mutableListOf()
+    var closestDrones: MutableList<Drone> = mutableListOf()
 
     fun setDronesInRadius() {
         Logger.radius("Drones in radius of $this")
@@ -21,14 +25,12 @@ class Zone(val id: Int, val center: Point) {
     fun getDrones(): MutableList<Drone> {
         var drones = getAlliedDrones()
         drones = (drones + getEnemyDrones()).toMutableList()
-        Logger.log("drones\n\t${drones.toSet().toMutableList()}")
         return drones.toSet().toMutableList()
     }
 
     fun getAlliedDrones(): MutableList<Drone> {
         var drones = getAlliedDronesTargets().toMutableList()
         drones = (drones + getAlliedDronesInRadius()).toMutableList()
-        Logger.log("drones\n\t${drones.toSet().toMutableList()}")
         return drones.toSet().toMutableList()
     }
 
@@ -40,21 +42,10 @@ class Zone(val id: Int, val center: Point) {
         return drones.toSet().toMutableList()
     }
 
-    fun getAlliedDronesInRadius(): MutableList<Drone> {
-        return dronesInRadius.filter { drone -> drone.isPersonnal() }.toMutableList()
-    }
-
-    fun getEnemyDronesInRadius(): MutableList<Drone> {
-        return dronesInRadius.filter { drone -> !drone.isPersonnal() }.toMutableList()
-    }
-
-    fun getAlliedDronesTargets(): MutableList<Drone> {
-        return targets.filter { drone -> drone.isPersonnal() }.toMutableList()
-    }
-
-    fun getEnemyDronesTargets(): MutableList<Drone> {
-        return targets.filter { drone -> !drone.isPersonnal() }.toMutableList()
-    }
+    fun getAlliedDronesInRadius(): MutableList<Drone> = dronesInRadius.filter { drone -> drone.isPersonnal() }.toMutableList()
+    fun getEnemyDronesInRadius(): MutableList<Drone> = dronesInRadius.filterNot { drone -> drone.isPersonnal() }.toMutableList()
+    fun getAlliedDronesTargets(): MutableList<Drone> = targets.filter { drone -> drone.isPersonnal() }.toMutableList()
+    fun getEnemyDronesTargets(): MutableList<Drone> = targets.filterNot { drone -> drone.isPersonnal() }.toMutableList()
 
     fun redistributeDrones(dronesToRedistribute: MutableList<Drone>) {
         dronesToRedistribute.forEach { drone ->
@@ -63,81 +54,59 @@ class Zone(val id: Int, val center: Point) {
         }
     }
 
-    fun redistributeAlliedDronesByDelta(numberOfDronesToRedistribute: Int? = null) {
-
-        if (numberOfDronesToRedistribute == null) {
-            Logger.log("Redistribution de tous les drones ${getAlliedDronesInRadius()}")
-            getAlliedDrones().forEach { drone -> drone.calculateTarget(mutableListOf(this)) }
-        } else {
-            Logger.log("Redistribution de $numberOfDronesToRedistribute drones")
-
-            getAlliedDrones().forEachIndexed() { index, drone ->
-                if (index < numberOfDronesToRedistribute) {
-                    drone.calculateTarget(mutableListOf(this))
-                    Logger.log("$drone, index $index, target : ${drone.target}")
-
-                }
-            }
-        }
-    }
-
     fun callUnusedDrone() {
-        Logger.log("Unused drone ${closestDrone()} has been called")
-        if (closestDrone().target!!.getAlliedDrones().count() > 1 && !closestDrone().target!!.isFree()) {
-            Logger.log("${closestDrone()} answering the call")
-            closestDrone().goToZone(this)
+        calculateClosestDrones()
+        val handlers = closestDrones.filter { it.canHandleCall() }
+
+        Logger.log(handlers)
+
+        if (handlers.isNotEmpty()) {
+            Logger.log("${handlers.first()} answering the call")
+            handlers.first().goToZone(this)
         }
 
     }
 
-    /**
-     * @param drone
-     * @return true si le drone est dans la zone
-     */
-    fun isDroneInRadius(drone: Drone) : Boolean {
-        val h = GE.getDistance(this.center, drone.position)
-        return h < 100
-    }
+    fun isDroneInRadius(drone: Drone) : Boolean = GE.getDistance(this.center, drone.position) < 100
 
     fun closestDrone(): Drone {
         var closestDrones = mutableListOf<DroneTarget>()
-
-        GE.getDrones().forEach { drone ->
+        GE.getAlliedDrones().forEach { drone ->
             closestDrones.add(DroneTarget(drone, GE.getDistance(this.center, drone.position)))
         }
-
         closestDrones.sortBy { it.distance }
-
         return closestDrones.first().drone
+    }
+
+    fun calculateClosestDrones() {
+        val droneTargets = mutableListOf<DroneTarget>()
+        closestDrones.clear()
+
+        GE.getAlliedDrones().forEach {
+            droneTargets.add(DroneTarget(it, GE.getDistance(this.center, it.position)))
+        }
+
+        droneTargets.sortBy { it.distance }
+        droneTargets.forEach { closestDrones.add(it.drone) }
     }
 
     fun calculateDistanceWithOtherZones(): Double {
         var distance = 0.0
-        GE.zones.forEach { zone ->
+        GE.ZONES.forEach { zone ->
             distance += GE.getDistance(this.center, zone.center)
         }
         return distance
     }
 
-    fun isUnderControl(): Boolean {
-        return controlledBy == GE.personnalPlayer && getEnemyDronesTargets().isEmpty()
-    }
+    fun isUnderControl(): Boolean = controlledBy == GE.PERSONNALPLAYER && getEnemyDronesTargets().isEmpty()
 
-    fun isFree(): Boolean {
-        return dronesInRadius.isEmpty()
-    }
+    /** Vrai si le nombre de drones dans son radius est null */
+    fun isFree(): Boolean = dronesInRadius.isEmpty()
+    fun isNotFocused() = getEnemyDronesTargets().isEmpty()
+    fun willBeUnderControl(): Boolean = controlledBy == GE.PERSONNALPLAYER && getEnemyDronesTargets().isEmpty()
 
-    fun willBeUnderControl(): Boolean {
-        return controlledBy == GE.personnalPlayer && getEnemyDronesTargets().isEmpty()
-    }
-
-    fun toStringAll() : String {
-        return "Zone $id [controlled by $controlledBy, center's at $center]"
-    }
-
-    override fun toString() : String {
-        return "Zone $id"
-    }
+    fun toStringAll() : String = "Zone $id [controlled by $controlledBy, center's at $center]"
+    override fun toString() : String = "Zone $id"
 }
 
 object ZoneFactory {
@@ -145,3 +114,7 @@ object ZoneFactory {
         return Zone(id, point)
     }
 }
+
+/**
+ * END OF ZONE
+ */
