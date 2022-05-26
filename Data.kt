@@ -9,7 +9,7 @@ object PointFactory {
 data class Player(var id: Int, val drones: MutableList<Drone>, var points: Int = 0) {
     override fun toString(): String = "Player $id"
 }
-object PlayerFactory { fun createPlayer(id: Int): Player = Player(id, mutableListOf<Drone>()) }
+object PlayerFactory { fun createPlayer(id: Int): Player = Player(id, mutableListOf()) }
 
 object Logger {
     var debug: Boolean = true

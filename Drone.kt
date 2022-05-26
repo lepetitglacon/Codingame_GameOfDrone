@@ -1,3 +1,5 @@
+
+
 /**
  * START DRONE
  */
@@ -10,7 +12,11 @@ class Drone (val id: Int, var position: Point) {
 
     fun calculateTarget(filters: MutableList<Zone> = mutableListOf()) {
         val candidates = mutableListOf<ZoneTarget>()
-        val zonesToTarget = GE.ZONES.filterNot { filters.contains(it) || it.willBeUnderControl() }.toMutableList()
+        var zonesToTarget = GE.ZONES
+            .filterNot { filters.contains(it) || it.willBeUnderControl() }
+            .toMutableList()
+
+        zonesToTarget = zonesToTarget.filterNot { filters.contains(it) }.toMutableList()
 
         zonesToTarget.forEach { zone ->
             val ratio = (GE.getDistance(zone.center, position) - GE.getDistance(zone.center, lastPosition)).absoluteValue
@@ -35,17 +41,10 @@ class Drone (val id: Int, var position: Point) {
                 if (!candidates.first().zone.targets.contains(this)) {
                     candidates.first().zone.targets.add(this)
                 }
-                Logger.log(candidates)
-                Logger.log("$this $target")
-                Logger.log(target!!)
-                Logger.log(target!!.center)
                 goToZone(target!!)
             }
-
-            Logger.log("$this $candidates")
         } else {
             target = closestZones.first()
-            Logger.log(closestZones.first())
             // reset candidates
             lastPosition = position
         }
@@ -70,18 +69,15 @@ class Drone (val id: Int, var position: Point) {
         zonesToCompare.forEach { zone -> zonesTargets.add(ZoneTarget(zone, GE.getDistance(zone.center, this.position))) }
         zonesTargets.sortBy { it.distance }
 
-        Logger.log("CLOSEST ZONES")
-        Logger.log("\tzones du $this")
-        zonesTargets.forEach { Logger.log("\t\t$it") }
-
+        Logger.log("zones du $this")
         zonesTargets.forEach {
+            Logger.log("\t$it")
             closestZones.add(it.zone)
         }
     }
 
     /** */
     fun canHandleCall() = target?.isUnderControl() ?: false
-
     /** Donne si un drone est dans une Zone ou non */
     fun isInRadius(zone: Zone) : Boolean = GE.getDistance(zone.center, this.position) < 100
     /** Donne si un drone est le nôtre ou non */

@@ -58,7 +58,7 @@ class Zone(val id: Int, val center: Point) {
         calculateClosestDrones()
         val handlers = closestDrones.filter { it.canHandleCall() }
 
-        Logger.log(handlers)
+        Logger.log("handlers $handlers")
 
         if (handlers.isNotEmpty()) {
             Logger.log("${handlers.first()} answering the call")
@@ -98,8 +98,18 @@ class Zone(val id: Int, val center: Point) {
         return distance
     }
 
-    fun isUnderControl(): Boolean = controlledBy == GE.PERSONNALPLAYER && getEnemyDronesTargets().isEmpty()
+    fun calculateDistanceWithOtherZonesOrderedByZones(): List<ZoneTarget> {
+        var zoneTargets = mutableListOf<ZoneTarget>()
+        GE.ZONES.forEach { zone ->
+            zoneTargets.add(ZoneTarget(zone, GE.getDistance(this.center, zone.center)))
+        }
+        zoneTargets.sortBy { it.distance }
+        return zoneTargets
+    }
 
+    fun isUnderControl(): Boolean = controlledBy == GE.PERSONNALPLAYER && getEnemyDronesTargets().isEmpty()
+    /** Vrai si le nombre de drone des autres joueurs sont supérieur à 1 */
+    fun isLockedByOtherPlayer() = getEnemyDronesTargets().groupBy { GE.getPlayerByDrone(it) }.filter { entry -> entry.value.count() > 1 }.isNotEmpty()
     /** Vrai si le nombre de drones dans son radius est null */
     fun isFree(): Boolean = dronesInRadius.isEmpty()
     fun isNotFocused() = getEnemyDronesTargets().isEmpty()
