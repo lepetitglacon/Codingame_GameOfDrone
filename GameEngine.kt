@@ -15,7 +15,7 @@ travailler sur la logique 10-20/20
 fun main(args : Array<String>) {
 
     // INITIALIZATION
-    GE.init(GameStrategie.COUNTERSTRIKE)
+    GE.init(GameStrategie.SPLIT)
 
     // GAME LOOP
     GE.play()
@@ -154,6 +154,10 @@ object GameEngine {
 
                     GameStrategie.FOCUSEDZONES -> {
                         goToFocusedZones()
+                    }
+
+                    GameStrategie.SPLIT -> {
+                        split()
                     }
 
                     else -> {
@@ -295,6 +299,16 @@ object GameEngine {
         }
     }
 
+    fun split() {
+        val droneForZones = numberOfDrones.div(numberOfZones)
+        ZONES.forEachIndexed { index, zone ->
+            for (i in 0..droneForZones) {
+                Logger.log("$index x $i = ${index + i}")
+                Logger.log(getAlliedDrones()[index + i])
+            }
+        }
+    }
+
     /** Calcule les zones les plus proches de chaques drones */
     private fun calculateClosestZonesForDrones() = getAllDrones().forEach { it.calculateClosestZones() }
     /** Calcule les drones les plus proches de chaques zones */
@@ -381,7 +395,8 @@ enum class GameStrategie {
     COUNTERSTRIKE,
     DEFENDANDCONQUER,
     CLOSESTZONE,
-    FOCUSEDZONES
+    FOCUSEDZONES,
+    SPLIT
 }
 
 enum class GameState {

@@ -16,9 +16,11 @@ class Drone (val id: Int, var position: Point) {
             zonesToTarget = GE.ZONES
         } else {
             zonesToTarget = GE.ZONES
-                .filterNot { filters.contains(it) || it.isSafelyUnderControl() }
+                .filterNot { filters.contains(it) }
                 .toMutableList()
         }
+
+        zonesToTarget.removeIf { it.isSafelyUnderControl() }
 
         zonesToTarget.forEach { zone ->
             val ratio = (GE.getDistance(zone.center, position) - GE.getDistance(zone.center, lastPosition)).absoluteValue
@@ -28,8 +30,6 @@ class Drone (val id: Int, var position: Point) {
         if (candidates.isNotEmpty()) {
             candidates.sortBy { it.distance }
             candidates.sortByDescending { it.ratio }
-
-            candidates.removeIf { it.distance == 0.0 }
 
             Logger.target("Candidats de $this sont ${candidates.first()}")
 
