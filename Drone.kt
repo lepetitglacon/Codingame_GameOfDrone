@@ -1,22 +1,24 @@
-
-
 /**
  * START DRONE
  */
 
 class Drone (val id: Int, var position: Point) {
     var lastPosition: Point = position
-    var state: DroneState = DroneStateClosestZone(this)
     var closestZones = mutableListOf<Zone>()
     var target: Zone? = null
+    var state: DroneState = DroneStateClosestZone(this)
 
-    fun calculateTarget(filters: MutableList<Zone> = mutableListOf()) {
+    fun calculateTarget(filters: MutableList<Zone>?) {
         val candidates = mutableListOf<ZoneTarget>()
-        var zonesToTarget = GE.ZONES
-            .filterNot { filters.contains(it) || it.willBeUnderControl() }
-            .toMutableList()
+        val zonesToTarget: MutableList<Zone>
 
-        zonesToTarget = zonesToTarget.filterNot { filters.contains(it) }.toMutableList()
+        if (filters == null) {
+            zonesToTarget = GE.ZONES
+        } else {
+            zonesToTarget = GE.ZONES
+                .filterNot { filters.contains(it) || it.isSafelyUnderControl() }
+                .toMutableList()
+        }
 
         zonesToTarget.forEach { zone ->
             val ratio = (GE.getDistance(zone.center, position) - GE.getDistance(zone.center, lastPosition)).absoluteValue
@@ -27,7 +29,11 @@ class Drone (val id: Int, var position: Point) {
             candidates.sortBy { it.distance }
             candidates.sortByDescending { it.ratio }
 
-            if (targetChanges(candidates) && GE.isAWinningTrade()) {
+            candidates.removeIf { it.distance == 0.0 }
+
+            Logger.target("Candidats de $this sont ${candidates.first()}")
+
+            if (targetChanges(candidates) && GE.isAWinningTrade() || GE.state == GameState.LOOSING) {
 
                 // enleve l'ancienne target de la zone
                 if (target?.targets?.contains(this) == true) {
@@ -41,15 +47,15 @@ class Drone (val id: Int, var position: Point) {
                 if (!candidates.first().zone.targets.contains(this)) {
                     candidates.first().zone.targets.add(this)
                 }
+
                 goToZone(target!!)
             }
         } else {
             target = closestZones.first()
-            // reset candidates
-            lastPosition = position
         }
     }
 
+    /** Vrai si la target change */
     private fun targetChanges(candidates: MutableList<ZoneTarget>) = target != candidates.first().zone
     fun goToZone(zone: Zone) = changeState(DroneStateGoTo(this, zone))
 
@@ -69,18 +75,21 @@ class Drone (val id: Int, var position: Point) {
         zonesToCompare.forEach { zone -> zonesTargets.add(ZoneTarget(zone, GE.getDistance(zone.center, this.position))) }
         zonesTargets.sortBy { it.distance }
 
-        Logger.log("zones du $this")
-        zonesTargets.forEach {
-            Logger.log("\t$it")
-            closestZones.add(it.zone)
+        if (GE.turns < 3) {
+            Logger.log("zones du $this")
+            zonesTargets.forEach {
+                Logger.log("\t$it")
+                closestZones.add(it.zone)
+            }
         }
+
     }
 
     /** */
-    fun canHandleCall() = target?.isUnderControl() ?: false
-    /** Donne si un drone est dans une Zone ou non */
+    fun canHandleCall() = target?.isSafelyUnderControl() ?: false
+    /** Vrai si le drone est dans une Zone */
     fun isInRadius(zone: Zone) : Boolean = GE.getDistance(zone.center, this.position) < 100
-    /** Donne si un drone est le nôtre ou non */
+    /** Vrai si le drone nous appartient */
     fun isPersonnal(): Boolean = GE.getPlayerByDrone(this) == GE.PERSONNALPLAYER
     /** Change le state du drone */
     fun changeState(state: DroneState) { this.state = state }
@@ -91,11 +100,11 @@ class Drone (val id: Int, var position: Point) {
 }
 
 class ZoneTarget(val zone: Zone, val distance: Double, val ratio: Double = 0.0) {
-    override fun toString(): String = "Target $zone à distance $distance avec un ratio de $ratio"
+    override fun toString(): String = "Target $zone à distance ${distance.absoluteValue} avec un ratio de $ratio"
 }
 
 class DroneTarget(val drone: Drone, val distance: Double) {
-    override fun toString(): String = "Target $drone à distance $distance"
+    override fun toString(): String = "Target $drone à distance ${distance.absoluteValue}"
 }
 
 object DroneFactory { fun createDrone(id: Int, position: Point): Drone = Drone(id, position) }
@@ -132,5 +141,3 @@ class DroneStateGoTo(val drone: Drone, val zone: Zone) : DroneState {
 /**
  * END OF DRONE
  */
-
-

@@ -46,11 +46,26 @@ class Zone(val id: Int, val center: Point) {
     fun getEnemyDronesInRadius(): MutableList<Drone> = dronesInRadius.filterNot { drone -> drone.isPersonnal() }.toMutableList()
     fun getAlliedDronesTargets(): MutableList<Drone> = targets.filter { drone -> drone.isPersonnal() }.toMutableList()
     fun getEnemyDronesTargets(): MutableList<Drone> = targets.filterNot { drone -> drone.isPersonnal() }.toMutableList()
+    /** Donne le nombre de drone du joueur qui à le plus de drone en direction de la zone */
+    private fun getEnemyDronesTargetsByPlayer(): MutableList<MutableList<Drone>> {
+        val dronesByPlayer = mutableListOf<MutableList<Drone>>()
+        GE.PLAYERS.forEach { player -> dronesByPlayer.add(getEnemyDronesTargets().filter { GE.getPlayerByDrone(it) == player }.toMutableList()) }
+        return dronesByPlayer
+    }
+    private fun getEnemyDronesInRadiusByPlayer(): MutableList<MutableList<Drone>> {
+        val dronesByPlayer = mutableListOf<MutableList<Drone>>()
+        GE.PLAYERS.forEach { player -> dronesByPlayer.add(getEnemyDronesInRadius().filter { GE.getPlayerByDrone(it) == player }.toMutableList()) }
+        return dronesByPlayer
+    }
+
+    fun getMaxEnemyDronesTargets() = getEnemyDronesTargetsByPlayer().maxOf { it.count() }
+    fun getMaxEnemyDronesInRadius() = getEnemyDronesInRadiusByPlayer().maxOf { it.count() }
 
     fun redistributeDrones(dronesToRedistribute: MutableList<Drone>) {
         dronesToRedistribute.forEach { drone ->
-            Logger.log("Redistribution de $drone")
-            drone.calculateTarget(mutableListOf(this))
+            Logger.log("\tRedistribution de $drone")
+            val list = mutableListOf(this)
+            drone.calculateTarget(list)
         }
     }
 
@@ -58,13 +73,12 @@ class Zone(val id: Int, val center: Point) {
         calculateClosestDrones()
         val handlers = closestDrones.filter { it.canHandleCall() }
 
-        Logger.log("handlers $handlers")
+        Logger.log("\thandlers disponibles $handlers")
 
         if (handlers.isNotEmpty()) {
             Logger.log("${handlers.first()} answering the call")
             handlers.first().goToZone(this)
         }
-
     }
 
     fun isDroneInRadius(drone: Drone) : Boolean = GE.getDistance(this.center, drone.position) < 100
@@ -107,13 +121,16 @@ class Zone(val id: Int, val center: Point) {
         return zoneTargets
     }
 
-    fun isUnderControl(): Boolean = controlledBy == GE.PERSONNALPLAYER && getEnemyDronesTargets().isEmpty()
+    /** Vrai si la zone est controllé et qu'aucun ennemi la cible */
+    fun isSafelyUnderControl(): Boolean = isUnderControl() && getEnemyDronesTargets().isEmpty() && getEnemyDronesInRadius().isEmpty()
+    /** Vrai si la zone est controllée par nous */
+    fun isUnderControl(): Boolean = controlledBy == GE.PERSONNALPLAYER
     /** Vrai si le nombre de drone des autres joueurs sont supérieur à 1 */
     fun isLockedByOtherPlayer() = getEnemyDronesTargets().groupBy { GE.getPlayerByDrone(it) }.filter { entry -> entry.value.count() > 1 }.isNotEmpty()
     /** Vrai si le nombre de drones dans son radius est null */
     fun isFree(): Boolean = dronesInRadius.isEmpty()
+    /** Vrai si aucun ennemi focus la zone */
     fun isNotFocused() = getEnemyDronesTargets().isEmpty()
-    fun willBeUnderControl(): Boolean = controlledBy == GE.PERSONNALPLAYER && getEnemyDronesTargets().isEmpty()
 
     fun toStringAll() : String = "Zone $id [controlled by $controlledBy, center's at $center]"
     override fun toString() : String = "Zone $id"

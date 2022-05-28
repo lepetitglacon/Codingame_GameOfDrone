@@ -2,6 +2,7 @@ import java.util.*
 import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sqrt
+/** laisse ce ^tn? d'import ! */
 import kotlin.math.absoluteValue
 
 /**
@@ -14,7 +15,7 @@ travailler sur la logique 10-20/20
 fun main(args : Array<String>) {
 
     // INITIALIZATION
-    GE.init(GameStrategie.FOCUSEDZONES)
+    GE.init(GameStrategie.COUNTERSTRIKE)
 
     // GAME LOOP
     GE.play()
@@ -32,6 +33,7 @@ object GameEngine {
     var gameStrategie = GameStrategie.COUNTERSTRIKE
 
     // engine
+    var state = GameState.LOOSING
     var turns = 0
     val zonesToFocus = mutableListOf<Zone>()
 
@@ -98,39 +100,47 @@ object GameEngine {
         }
     }
 
+    private fun updateState() {
+        if (isWinning()) {
+            state = GameState.WINNING
+        } else {
+            state = GameState.LOOSING
+        }
+    }
+
     /** Engine */
     private fun isWinning(): Boolean = controlsMoreZones() && hasMorePoints()
     private fun controlsMoreZones(): Boolean = ZONES.filter { it.controlledBy == PERSONNALPLAYER }.count() >= numberOfZones.div(2)
     private fun hasMorePoints(): Boolean = PLAYERS.filter { it.points >= PERSONNALPLAYER!!.points }.first() == PERSONNALPLAYER
-    fun isAWinningTrade(): Boolean = ZONES.filter { it.controlledBy == PERSONNALPLAYER }.count() + 1 >= (numberOfZones/2)
+    fun isAWinningTrade(): Boolean = ZONES.filter { it.controlledBy == PERSONNALPLAYER }.count().plus(1) >= (numberOfZones.div(2))
 
     /** Main loop */
     fun play() {
 
         while (true) {
             Logger.engine("Tour $turns")
+            Logger.engine(state.name)
 
             // input from coding game
             updateZonesControl()
             updateDronesPosition()
+            updateState()
 
-            if (turns == numberOfPlayers) {
+            if (turns <= numberOfPlayers) {
                 calculateZonesToFocus()
             }
 
             // tour 0
             if (isFirstTurn()) {
-                calculateClosestZones()
-
+                calculateClosestZonesForDrones()
+                calculateClosestDronesForZones()
             } else {
                 when (gameStrategie) {
                     GameStrategie.COUNTERSTRIKE -> {
-                        if (isWinning()) {
-                            Logger.engine("WINNING\n")
+                        if (state == GameState.WINNING) {
                             calculateDefendingTargets()
                             counterTargets()
                         } else {
-                            Logger.engine("LOOSING\n")
                             calculateTargets()
                             counterTargets()
                         }
@@ -188,8 +198,10 @@ object GameEngine {
      */
     fun calculateTargets() {
         ZONES.forEach { it.setDronesInRadius() }
-        getAllDrones().forEach { it.calculateTarget() }
+        getAllDrones().forEach { it.calculateTarget(null) }
     }
+
+    /** TODO se concentrer sur les zones qu'on a et les défendre */
     fun calculateDefendingTargets() = calculateTargets()
 
     /**
@@ -197,43 +209,70 @@ object GameEngine {
      */
     fun counterTargets() {
 
-        zonesToFocus.forEach { zone ->
-
+        ZONES.forEach { zone ->
+            Logger.engine("$zone")
             val inRadiusDelta = zone.getAlliedDronesInRadius().count() - zone.getEnemyDronesInRadius().count()
             val inCommingDroneDelta = zone.getAlliedDronesTargets().count() - zone.getEnemyDronesTargets().count()
             val globalDelta = inRadiusDelta + inCommingDroneDelta
+
+            Logger.log("Nombre de drone ennemies qui vont vers $zone = ${zone.getMaxEnemyDronesTargets()}")
+            Logger.log("Nombre de drone ennemies qui sont sur $zone = ${zone.getMaxEnemyDronesInRadius()}")
 
             when (globalDelta.sign) {
 
                 // On va controller la zone
                 1 -> {
-                    Logger.log("$zone va être gagnée")
-                    if (zone.isUnderControl()) {
+                    Logger.engine("$zone va être gagnée")
+                    if (zone.isSafelyUnderControl()) {
                         zone.redistributeDrones(zone.getAlliedDrones())
+                    } else {
+
+                        if (zone.getAlliedDronesInRadius().count() > zone.getEnemyDronesInRadius().count()) {
+                            zone.redistributeDrones(zone.getEnemyDronesInRadius().filterIndexed { index, drone -> index < zone.getAlliedDronesInRadius().count() - zone.getEnemyDronesInRadius().count() }.toMutableList())
+                        } else {
+                            if (zone.getAlliedDronesInRadius().isNotEmpty()) {
+                                Logger.log("${zone.getEnemyDronesTargets().count()} drones ennemies son en route \t${zone.getEnemyDronesTargets()}")
+//                        zone.redistributeDrones(zone.getAlliedDronesInRadius().filterIndexed { index, drone -> index < zone.getMaxEnemyDronesTargets() }.toMutableList())
+                                zone.redistributeDrones(mutableListOf(zone.getAlliedDronesInRadius().first()))
+                            }
+                        }
+
+
+
                     }
                 }
 
                 // La zone va etre neutre ou sous tensions
                 0 -> {
+
+                    if (zone.isSafelyUnderControl()) {
+                        Logger.engine("$zone est sous control")
+                        zone.redistributeDrones(zone.getAlliedDrones())
+                    }
+
                     if (zone.isNotFocused() && zone.isFree()) {
-                        Logger.log("$zone est libre")
+                        Logger.engine("$zone est libre")
                         zone.callUnusedDrone()
                     } else {
-                        Logger.log("$zone c'est le zbeul")
-                        if (zone.closestDrone().isPersonnal()) {
-                            Logger.log("$zone plus proche drone est ${zone.closestDrone()}")
+                        Logger.engine("$zone c'est le zbeul")
+
+                        if (zone.isUnderControl()) {
+                            if (zone.closestDrone().isPersonnal()) {
+                                Logger.engine("$zone plus proche drone allié est ${zone.closestDrone()}")
+                            } else {
+                                Logger.engine("$zone plus proche drone ennemi est ${zone.closestDrone()}, on redistribue")
+                                zone.redistributeDrones(zone.getAlliedDrones())
+                            }
                         } else {
-                            Logger.log("$zone plus proche drone est ${zone.closestDrone()}")
-                            Logger.log("$zone on redistribue")
-                            zone.redistributeDrones(zone.getAlliedDrones())
+                               zone.redistributeDrones(zone.getAlliedDrones())
                         }
+
                     }
                 }
 
                 // L'ennemi va controller la zone
                 -1 -> {
-                    Logger.log("$zone est perdue")
-                    Logger.log("$zone on redistribue")
+                    Logger.engine("$zone est perdue, on redistribue")
                     zone.redistributeDrones(zone.getAlliedDrones())
                 }
             }
@@ -242,15 +281,24 @@ object GameEngine {
     }
 
     fun goToFocusedZones() {
-        calculateClosestZones()
+        calculateClosestZonesForDrones()
 
-        zonesToFocus.forEach {
-            it.closestDrones.first().goToZone(it)
+        getAlliedDrones().forEachIndexed { index, drone ->
+
+            var zoneToGo = zonesToFocus[index % zonesToFocus.count()]
+
+            if (!zoneToGo.isSafelyUnderControl()) {
+                zoneToGo = ZONES.filter { it.isFree() }.first()
+            }
+
+            drone.goToZone(zoneToGo)
         }
     }
 
     /** Calcule les zones les plus proches de chaques drones */
-    private fun calculateClosestZones() = getAllDrones().forEach { drone -> drone.calculateClosestZones() }
+    private fun calculateClosestZonesForDrones() = getAllDrones().forEach { it.calculateClosestZones() }
+    /** Calcule les drones les plus proches de chaques zones */
+    private fun calculateClosestDronesForZones() = zonesToFocus.forEach { it.calculateClosestDrones() }
 
     /** Calcule les zones les + proches entre elles */
     private fun calculateZonesToFocus() {
@@ -334,6 +382,11 @@ enum class GameStrategie {
     DEFENDANDCONQUER,
     CLOSESTZONE,
     FOCUSEDZONES
+}
+
+enum class GameState {
+    LOOSING,
+    WINNING
 }
 
 /**
