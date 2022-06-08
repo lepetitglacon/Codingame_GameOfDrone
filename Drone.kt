@@ -6,7 +6,12 @@ class Drone (val id: Int, var position: Point) {
     var lastPosition: Point = position
     var closestZones = mutableListOf<Zone>()
     var target: Zone? = null
+    var firstTarget: Zone? = null
     var state: DroneState = DroneStateClosestZone(this)
+
+    fun calculateFirstTarget() {
+        firstTarget = closestZones.first()
+    }
 
     fun calculateTarget(filters: MutableList<Zone>?) {
         val candidates = mutableListOf<ZoneTarget>()
@@ -75,12 +80,13 @@ class Drone (val id: Int, var position: Point) {
         zonesToCompare.forEach { zone -> zonesTargets.add(ZoneTarget(zone, GE.getDistance(zone.center, this.position))) }
         zonesTargets.sortBy { it.distance }
 
-        if (GE.turns < 3) {
+        if (GE.turns < GE.numberOfPlayers) {
             Logger.log("zones du $this")
             zonesTargets.forEach {
                 Logger.log("\t$it")
                 closestZones.add(it.zone)
             }
+            firstTarget = closestZones.first()
         }
 
     }

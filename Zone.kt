@@ -132,6 +132,9 @@ class Zone(val id: Int, val center: Point) {
     /** Vrai si aucun ennemi focus la zone */
     fun isNotFocused() = getEnemyDronesTargets().isEmpty()
 
+    fun hasMoreAlliedInRadius() = getAlliedDronesInRadius().count() > getEnemyDronesInRadius().count()
+    fun hasMoreAlliedInComming() = getAlliedDronesTargets().count() > getEnemyDronesTargets().count()
+
     fun toStringAll() : String = "Zone $id [controlled by $controlledBy, center's at $center]"
     override fun toString() : String = "Zone $id"
 }

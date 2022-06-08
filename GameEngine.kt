@@ -14,10 +14,8 @@ travailler sur la logique 10-20/20
 
 fun main(args : Array<String>) {
 
-    // INITIALIZATION
-    GE.init(GameStrategie.SPLIT)
+    GE.init(GameStrategie.COUNTERSTRIKE)
 
-    // GAME LOOP
     GE.play()
 }
 
@@ -150,6 +148,7 @@ object GameEngine {
                     }
 
                     GameStrategie.CLOSESTZONE -> {
+                        getAlliedDrones().forEach { it.goToZone(it.closestZones.first()) }
                     }
 
                     GameStrategie.FOCUSEDZONES -> {
@@ -228,21 +227,28 @@ object GameEngine {
                 1 -> {
                     Logger.engine("$zone va être gagnée")
                     if (zone.isSafelyUnderControl()) {
+                        Logger.engine("$zone est safe on redistribue tous les drones")
                         zone.redistributeDrones(zone.getAlliedDrones())
                     } else {
 
-                        if (zone.getAlliedDronesInRadius().count() > zone.getEnemyDronesInRadius().count()) {
-                            zone.redistributeDrones(zone.getEnemyDronesInRadius().filterIndexed { index, drone -> index < zone.getAlliedDronesInRadius().count() - zone.getEnemyDronesInRadius().count() }.toMutableList())
-                        } else {
-                            if (zone.getAlliedDronesInRadius().isNotEmpty()) {
-                                Logger.log("${zone.getEnemyDronesTargets().count()} drones ennemies son en route \t${zone.getEnemyDronesTargets()}")
-//                        zone.redistributeDrones(zone.getAlliedDronesInRadius().filterIndexed { index, drone -> index < zone.getMaxEnemyDronesTargets() }.toMutableList())
-                                zone.redistributeDrones(mutableListOf(zone.getAlliedDronesInRadius().first()))
+                        if (zone.hasMoreAlliedInRadius() && zone.isUnderControl()) {
+                            if (zone.hasMoreAlliedInComming()) {
+                                val droneToRedistribute = zone.getAlliedDronesTargets().count() - zone.getEnemyDronesTargets().count()
+                                zone.redistributeDrones(zone.getAlliedDronesTargets().filterIndexed { index, drone ->
+                                    index < droneToRedistribute }.toMutableList()
+                                )
+                                Logger.engine("$zone on redistribue $droneToRedistribute drones parmis ceux qui viennent")
+                            } else {
+                                Logger.engine("$zone on redistribue pas les drones")
                             }
+                        } else {
+                            Logger.engine("$zone on redistribue pas les drones")
+//                            if (zone.getAlliedDronesInRadius().isNotEmpty()) {
+//                                Logger.log("${zone.getEnemyDronesTargets().count()} drones ennemies sont en route \t${zone.getEnemyDronesTargets()}")
+//                                zone.redistributeDrones(zone.getAlliedDronesInRadius().filterIndexed { index, drone -> index < zone.getMaxEnemyDronesTargets() }.toMutableList())
+////                                zone.redistributeDrones(mutableListOf(zone.getAlliedDronesInRadius().first()))
+//                            }
                         }
-
-
-
                     }
                 }
 
@@ -268,7 +274,8 @@ object GameEngine {
                                 zone.redistributeDrones(zone.getAlliedDrones())
                             }
                         } else {
-                               zone.redistributeDrones(zone.getAlliedDrones())
+                            Logger.engine("On aura pas la $zone on redistribue tous les drones")
+                            zone.redistributeDrones(zone.getAlliedDrones())
                         }
 
                     }
@@ -301,11 +308,26 @@ object GameEngine {
 
     fun split() {
         val droneForZones = numberOfDrones.div(numberOfZones)
-        ZONES.forEachIndexed { index, zone ->
-            for (i in 0..droneForZones) {
-                Logger.log("$index x $i = ${index + i}")
-                Logger.log(getAlliedDrones()[index + i])
+        val freeDrones = numberOfDrones.mod(numberOfZones)
+        Logger.log(droneForZones)
+        var zoneCounter = 0
+        var droneCounter = 0
+        var i = 0
+
+        while (zoneCounter < numberOfZones - 1) {
+            if (i == droneForZones) {
+                zoneCounter++
+                i = 0
+                continue
             }
+//            getAlliedDrones()[droneCounter].target = ZONES[zoneCounter]
+            Logger.log("${getAlliedDrones()[droneCounter]} target ${ZONES[zoneCounter]} ite de drone = $i")
+            i++
+            droneCounter++
+        }
+
+        if (freeDrones > 0) {
+
         }
     }
 
