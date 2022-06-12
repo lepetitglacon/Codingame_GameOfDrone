@@ -4,9 +4,16 @@
 
 class Zone(val id: Int, val center: Point) {
     var controlledBy: Player? = null
+        set(value) {
+            if (field !== value) {
+                this.getAlliedDrones().forEach { it.onZoneCapture(this) }
+            }
+            field = value
+        }
     var dronesInRadius: MutableList<Drone> = mutableListOf()
     var targets: MutableList<Drone> = mutableListOf()
     var closestDrones: MutableList<Drone> = mutableListOf()
+
 
     fun setDronesInRadius() {
         Logger.radius("Drones in radius of $this")
@@ -139,11 +146,7 @@ class Zone(val id: Int, val center: Point) {
     override fun toString() : String = "Zone $id"
 }
 
-object ZoneFactory {
-    fun createZone(id: Int, point: Point): Zone {
-        return Zone(id, point)
-    }
-}
+object ZoneFactory { fun createZone(id: Int, point: Point): Zone = Zone(id, point) }
 
 /**
  * END OF ZONE

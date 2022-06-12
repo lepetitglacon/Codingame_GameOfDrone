@@ -13,9 +13,7 @@ travailler sur la logique 10-20/20
  */
 
 fun main(args : Array<String>) {
-
     GE.init(GameStrategie.COUNTERSTRIKE)
-
     GE.play()
 }
 
@@ -145,6 +143,7 @@ object GameEngine {
                     }
 
                     GameStrategie.DEFENDANDCONQUER -> {
+
                     }
 
                     GameStrategie.CLOSESTZONE -> {

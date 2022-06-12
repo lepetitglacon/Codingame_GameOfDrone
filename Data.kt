@@ -1,5 +1,5 @@
 /** Point Data */
-data class Point(var x: Int = 0, var y: Int = 0) { override fun toString(): String = "${x} ${y}" }
+data class Point(var x: Int = 0, var y: Int = 0) { override fun toString(): String = "$x $y" }
 object PointFactory {
     fun createPointWithCoordinates(x: Int = 0, y: Int = 0) : Point = Point(x, y)
     fun createPoint() : Point = Point()

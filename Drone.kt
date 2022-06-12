@@ -2,7 +2,7 @@
  * START DRONE
  */
 
-class Drone (val id: Int, var position: Point) {
+class Drone (val id: Int, var position: Point): ZoneCaptureObserver {
     var lastPosition: Point = position
     var closestZones = mutableListOf<Zone>()
     var target: Zone? = null
@@ -13,10 +13,14 @@ class Drone (val id: Int, var position: Point) {
         firstTarget = closestZones.first()
     }
 
+    /**
+     * Calcule la cible du drone
+     */
     fun calculateTarget(filters: MutableList<Zone>?) {
         val candidates = mutableListOf<ZoneTarget>()
         val zonesToTarget: MutableList<Zone>
 
+        // on filtre les zones
         if (filters == null) {
             zonesToTarget = GE.ZONES
         } else {
@@ -60,10 +64,6 @@ class Drone (val id: Int, var position: Point) {
         }
     }
 
-    /** Vrai si la target change */
-    private fun targetChanges(candidates: MutableList<ZoneTarget>) = target != candidates.first().zone
-    fun goToZone(zone: Zone) = changeState(DroneStateGoTo(this, zone))
-
     /** Calcule les zones les plus proches */
     fun calculateClosestZones(filter: Zone? = null) {
         val zonesToCompare: MutableList<Zone>
@@ -91,6 +91,10 @@ class Drone (val id: Int, var position: Point) {
 
     }
 
+    /** Vrai si la target change */
+    private fun targetChanges(candidates: MutableList<ZoneTarget>) = target != candidates.first().zone
+    /** Dis à un drone d'aller à une zone */
+    fun goToZone(zone: Zone) = changeState(DroneStateGoTo(this, zone))
     /** */
     fun canHandleCall() = target?.isSafelyUnderControl() ?: false
     /** Vrai si le drone est dans une Zone */
@@ -102,6 +106,11 @@ class Drone (val id: Int, var position: Point) {
 
     /** Donne le point vers lequel le drone doit se diriger */
     fun move() : Point = this.state.move()
+
+    override fun onZoneCapture(zone: Zone) {
+        Logger.event("$this has been notified of $zone capture")
+    }
+
     override fun toString() : String = "Drone $id"
 }
 
@@ -114,6 +123,7 @@ class DroneTarget(val drone: Drone, val distance: Double) {
 }
 
 object DroneFactory { fun createDrone(id: Int, position: Point): Drone = Drone(id, position) }
+
 interface DroneState { fun move() : Point }
 
 class DroneStateIdle(val drone: Drone) : DroneState {
@@ -142,6 +152,10 @@ class DroneStateGoTo(val drone: Drone, val zone: Zone) : DroneState {
         Logger.state("$drone is going strait to $zone")
         return zone.center
     }
+}
+
+interface ZoneCaptureObserver {
+    fun onZoneCapture(zone: Zone)
 }
 
 /**
